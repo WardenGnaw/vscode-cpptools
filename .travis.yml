@@ -1,3 +1,6 @@
+os:
+  - linux
+
 language: node_js
 
 node_js:
@@ -34,10 +37,4 @@ script:
   - npm run tslint
   - npm run compile
   - npm run test
-
-after_failure:
   - find ~ -name "integrationTests.log" -type f -exec cat {} \;
-
-after_success:
-  - find ~ -name "integrationTests.log" -type f -exec cat {} \;
-  

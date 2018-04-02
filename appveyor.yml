@@ -1,0 +1,37 @@
+image:
+# https://www.appveyor.com/docs/build-environment/#pre-installed-software
+- Visual Studio 2015
+
+environment:
+  matrix:
+    - nodejs_version: "8.9.1"
+
+
+# Uncomment to enable rdp. Set password with environment variable: APPVEYOR_RDP_PASSWORD (timeout is 60 min)
+#init:
+#- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+  - ps: Install-Product node $env:nodejs_version
+  # Download debugAdapters from an existing extension version. See TravisCI settings to set CPPTOOL_VERSION
+  - ps: mkdir -p $env:HomePath/.vscode/extensions/ms-vscode.cpptools-$env:CPPTOOL_VERSION
+  - ps: Invoke-WebRequest https://github.com/Microsoft/vscode-cpptools/releases/download/$env:CPPTOOL_VERSION/cpptools.vsix -OutFile $env:HomePath/cpptools.zip
+  - ps: Expand-Archive $env:HomePath/cpptools.zip -DestinationPath $env:HomePath/.
+  - ps: mv $env:HomePath/extension/debugAdapters $env:HomePath/.vscode/extensions/ms-vscode.cpptools-$env:CPPTOOL_VERSION/debugAdapters
+
+build_script:
+  # Build and then run tests
+  - cd Extension
+  - npm install
+  - npm run compile
+
+before_test:
+  - set PATH=C:\MinGW\bin\;%PATH%
+
+test_script:
+  - npm run tslint
+  - npm run test
+
+# Uncomment to enable rdp
+#on_finish:
+#- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
