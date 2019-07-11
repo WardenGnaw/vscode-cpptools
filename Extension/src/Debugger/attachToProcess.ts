@@ -118,11 +118,18 @@ export class RemoteAttachPicker {
         `then ${PsProcessParser.psDarwinCommand}; fi${innerQuote}${outerQuote}`;
     }
 
+    private ignoreStdErr(stdErr: string): Thenable<boolean> {
+        return vscode.window.showQuickPick(["Proceed", "Cancel"], {
+            ignoreFocusOut: true,
+            placeHolder: stdErr
+        }).then(userSelection => userSelection === "Proceed");
+    }
+
     private getRemoteOSAndProcesses(pipeCmd: string): Promise<AttachItem[]> {
         // Do not add any quoting in execCommand.
         const execCommand: string = `${pipeCmd} ${this.getRemoteProcessCommand()}`;
 
-        return util.execChildProcess(execCommand, null, this._channel).then(output => {
+        return util.execChildProcess(execCommand, null, this.ignoreStdErr, this._channel).then(output => {
             // OS will be on first line
             // Processes will follow if listed
             let lines: string[] = output.split(/\r?\n/);

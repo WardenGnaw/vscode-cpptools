@@ -570,9 +570,9 @@ export function logToFile(message: string): void {
     fs.writeFileSync(logFolder, `${message}${os.EOL}`, { flag: 'a' });
 }
 
-export function execChildProcess(process: string, workingDirectory: string, channel?: vscode.OutputChannel): Promise<string> {
+export function execChildProcess(process: string, workingDirectory: string, ignoreStdErrorCallback?: (stdErr) => Thenable<boolean>, channel?: vscode.OutputChannel): Promise<string> {
     return new Promise<string>((resolve, reject) => {
-        child_process.exec(process, { cwd: workingDirectory, maxBuffer: 500 * 1024 }, (error: Error, stdout: string, stderr: string) => {
+        child_process.exec(process, { cwd: workingDirectory, maxBuffer: 500 * 1024 }, async (error: Error, stdout: string, stderr: string) => {
             if (channel) {
                 let message: string = "";
                 let err: Boolean = false;
@@ -602,8 +602,14 @@ export function execChildProcess(process: string, workingDirectory: string, chan
             }
 
             if (stderr && stderr.length > 0) {
-                reject(new Error(stderr));
-                return;
+                let ignoreStdErr: boolean = false;
+                if (ignoreStdErrorCallback) {
+                    ignoreStdErr = await ignoreStdErrorCallback(stderr)
+                }
+                if (!ignoreStdErr) {
+                    reject(new Error(stderr));
+                    return;
+                }
             }
 
             resolve(stdout);
