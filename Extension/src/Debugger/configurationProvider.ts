@@ -188,7 +188,7 @@ class CppConfigurationProvider implements vscode.DebugConfigurationProvider {
             if (config.type === 'cppvsdbg') {
                 // Fail if cppvsdbg type is running on non-Windows
                 if (os.platform() !== 'win32') {
-                    logger.getOutputChannelLogger().showWarningMessage(localize("debugger.not.available", "Debugger of type: '{0}' is only available on Windows. Use type: '{1}' on the current OS platform.", "cppvsdbg", "cppdbg"));
+                    vscode.window.showWarningMessage(localize("debugger.not.available", "Debugger of type: '{0}' is only available on Windows. Use type: '{1}' on the current OS platform.", "cppvsdbg", "cppdbg"));
                     return undefined;
                 }
 
@@ -231,9 +231,59 @@ class CppConfigurationProvider implements vscode.DebugConfigurationProvider {
                     config.pipeTransport.pipeProgram = replacedPipeProgram;
                 }
             }
+
+            const macOSMIMode: string = config.osx?.MIMode ?? config.MIMode;
+            const macOSMIDebuggerPath: string = config.osx?.miDebuggerPath ?? config.miDebuggerPath;
+
+            // Validate LLDB-MI
+            if (os.platform() === 'darwin' && // Check for macOS
+                (!macOSMIMode || macOSMIMode === 'lldb') &&
+                !macOSMIDebuggerPath && // User did not provide custom lldb-mi
+                !this.hasLLDBFramework()
+                ) {
+
+                const moreInfoMessage: string = localize("lldb.framework.more.info", "More Info");
+                const LLDBFrameworkMissingMessage: string = localize("ldlb.framework.not.found", "Missing 'LLDB.framework' for lldb-mi.");
+
+                vscode.window.showErrorMessage(LLDBFrameworkMissingMessage, moreInfoMessage)
+                 .then(value => {
+                    if (value === moreInfoMessage) {
+                        let helpURL: string = "https://aka.ms/VSCode-CPP-LLDBFrameworkNotFoundHelp";
+                        vscode.env.openExternal(vscode.Uri.parse(helpURL));
+                    }
+                });
+
+                return undefined;
+            }
         }
         // if config or type is not specified, return null to trigger VS Code to open a configuration file https://github.com/Microsoft/vscode/issues/54213
         return config && config.type ? config : null;
+    }
+
+    private hasLLDBFramework(): boolean {
+        const LLDBFramework: string = "LLDB.framework";
+        let searchPaths: string[] = [
+            "/Library/Developer/CommandLineTools/Library/PrivateFrameworks", // XCode CLI
+            "/Applications/Xcode.app/Contents/SharedFrameworks" // App Store XCode
+        ];
+
+        for (const searchPath of searchPaths) {
+            if (fs.existsSync(path.join(searchPath, LLDBFramework))) {
+                return true;
+            }
+        }
+
+        const outputChannel: logger.Logger = logger.getOutputChannelLogger();
+
+        outputChannel.appendLine(localize("lldb.find.failed", "Missing dependency '{0}' for lldb-mi executable.", LLDBFramework));
+        outputChannel.appendLine(localize("lldb.search.paths", "Searched in:"));
+        searchPaths.forEach(searchPath => {
+            outputChannel.appendLine(`\t${searchPath}`);
+        });
+        outputChannel.appendLine(localize("lldb.install.help", "To resolve this issue, please either install XCode through the App Store or install XCode CLI with 'xcode-select --install'."));
+        logger.showOutputChannel();
+
+        return false;
     }
 
     private resolveEnvFile(config: vscode.DebugConfiguration, folder: vscode.WorkspaceFolder): void {
